@@ -1,5 +1,5 @@
-use std::io::{BufRead, BufReader, Read, Write};
 #[allow(unused_imports)]
+use std::io::{BufRead, BufReader, Read, Write};
 use std::net::TcpListener;
 
 fn main() {
@@ -20,7 +20,7 @@ fn main() {
                 let first_line_split = first_line.split(" ").collect::<Vec<&str>>();
                 let (method, path) = (first_line_split[0], first_line_split[1]);
 
-                let mut response = "HTTP/1.1 404 Not Found\r\n\r\n";
+                let response;
 
                 match method {
                     "GET" => {
