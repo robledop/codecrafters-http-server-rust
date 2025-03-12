@@ -1,3 +1,5 @@
+use flate2::write::GzEncoder;
+use flate2::Compression;
 #[allow(unused_imports)]
 use std::env;
 use std::fs;
@@ -82,16 +84,23 @@ fn handle_request(mut stream: TcpStream, directory: String) {
                         .trim()
                         .split(", ")
                         .collect();
-                    
+
                     if accept_encoding.contains(&"gzip") {
-                        format!(
+                        let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
+                        encoder.write_all(message.as_bytes()).unwrap();
+                        let compressed_bytes = encoder.finish().unwrap();
+
+                        let res = format!(
                             "HTTP/1.1 200 OK\r\n\
                             Content-Type: text/plain\r\n\
                             Content-Encoding: gzip\r\n\
-                            Content-Length: {}\r\n\r\n{}",
-                            message.len(),
-                            message
-                        )
+                            Content-Length: {}\r\n\r\n",
+                            compressed_bytes.len(),
+                        );
+
+                        stream.write_all(&res.as_bytes()).unwrap();
+                        stream.write_all(&compressed_bytes).unwrap();
+                        return;
                     } else {
                         format!(
                             "HTTP/1.1 200 OK\r\n\
@@ -173,7 +182,9 @@ fn handle_request(mut stream: TcpStream, directory: String) {
         _ => METHOD_NOT_ALLOWED.to_string(),
     };
 
-    stream
-        .write_all(response.as_bytes())
-        .expect("Failed to write to server");
+    if !response.is_empty() {
+        stream
+            .write_all(response.as_bytes())
+            .expect("Failed to write to server");
+    }
 }
