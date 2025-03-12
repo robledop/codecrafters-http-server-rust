@@ -80,11 +80,9 @@ fn handle_request(mut stream: TcpStream, directory: String) {
                     let accept_encoding: Vec<&str> = accept_encoding_line
                         ["accept-encoding: ".len()..]
                         .trim()
-                        .split(';')
+                        .split(", ")
                         .collect();
                     
-                    println!("{:?}", accept_encoding);
-
                     if accept_encoding.contains(&"gzip") {
                         format!(
                             "HTTP/1.1 200 OK\r\n\
