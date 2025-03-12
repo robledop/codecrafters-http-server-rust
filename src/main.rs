@@ -4,6 +4,12 @@ use std::fs;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
+use std::string::ToString;
+
+const NOT_FOUND: &str = "HTTP/1.1 404 Not Found\r\n\r\n";
+const CREATED: &str = "HTTP/1.1 201 Created\r\n\r\n";
+const OK: &str = "HTTP/1.1 200 OK\r\n\r\n";
+const METHOD_NOT_ALLOWED: &str = "HTTP/1.1 405 Method not allowed\r\n\r\n";
 
 fn main() {
     env::set_var("RUST_BACKTRACE", "1");
@@ -62,23 +68,56 @@ fn handle_request(mut stream: TcpStream, directory: String) {
 
     let response = match method {
         "GET" => match path {
-            "/" => "HTTP/1.1 200 OK\r\n\r\n".to_string(),
+            "/" => OK.to_string(),
             p if p.starts_with("/echo/") => {
-                let message = &path[6..].trim().to_string();
-                format!(
-                    "HTTP/1.1 200 OK\r\n\
-                                Content-Type: text/plain\r\n\
-                                Content-Length: {}\r\n\r\n{}",
-                    message.len(),
-                    message
-                )
+                let message = &path["/echo/".len()..].trim().to_string();
+
+                let accept_encoding_line = headers
+                    .iter()
+                    .find(|&x| x.to_lowercase().starts_with("accept-encoding: "));
+
+                if let Some(accept_encoding_line) = accept_encoding_line {
+                    let accept_encoding: Vec<&str> = accept_encoding_line
+                        ["accept-encoding: ".len()..]
+                        .trim()
+                        .split(';')
+                        .collect();
+
+                    if accept_encoding.contains(&"gzip") {
+                        format!(
+                            "HTTP/1.1 200 OK\r\n\
+                            Content-Type: text/plain\r\n\
+                            Content-Encoding: gzip\r\n\
+                            Content-Length: {}\r\n\r\n{}",
+                            message.len(),
+                            message
+                        )
+                    } else {
+                        format!(
+                            "HTTP/1.1 200 OK\r\n\
+                            Content-Type: text/plain\r\n\
+                            Content-Length: {}\r\n\r\n{}",
+                            message.len(),
+                            message
+                        )
+                    }
+                } else {
+                    format!(
+                        "HTTP/1.1 200 OK\r\n\
+                        Content-Type: text/plain\r\n\
+                        Content-Length: {}\r\n\r\n{}",
+                        message.len(),
+                        message
+                    )
+                }
             }
             "/user-agent" => {
                 let user_agent_line = headers
                     .iter()
-                    .find(|&x| x.starts_with("User-Agent: "))
+                    .find(|&x| x.to_lowercase().starts_with("user-agent: "))
                     .unwrap();
-                let user_agent = &user_agent_line[12..].trim().to_string();
+                let user_agent = &user_agent_line["user-agent: ".len()..].trim().to_string();
+
                 format!(
                     "HTTP/1.1 200 OK\r\n\
                     Content-Type: text/plain\r\n\
@@ -90,7 +129,7 @@ fn handle_request(mut stream: TcpStream, directory: String) {
                 )
             }
             p if p.starts_with("/files/") => {
-                let file_name = &path[7..].trim().to_string();
+                let file_name = &path["/files/".len()..].trim().to_string();
                 let file_path = format!("{}{}", directory, file_name);
 
                 let file_content = fs::read_to_string(&file_path);
@@ -103,20 +142,20 @@ fn handle_request(mut stream: TcpStream, directory: String) {
                         file.len(),
                         file
                     ),
-                    Err(_) => "HTTP/1.1 404 Not Found\r\n\r\n".to_string(),
+                    Err(_) => NOT_FOUND.to_string(),
                 }
             }
-            _ => "HTTP/1.1 404 Not Found\r\n\r\n".to_string(),
+            _ => NOT_FOUND.to_string(),
         },
         "POST" => match path {
             p if p.starts_with("/files/") => {
-                let file_name = &path[7..].trim().to_string();
+                let file_name = &path["/files/".len()..].trim().to_string();
                 let file_path = format!("{}{}", directory, file_name);
 
                 let content_length: usize = headers
                     .iter()
-                    .find(|&x| x.starts_with("Content-Length: "))
-                    .unwrap()[16..]
+                    .find(|&x| x.to_lowercase().starts_with("content-length: "))
+                    .unwrap()["Content-Length: ".len()..]
                     .trim()
                     .parse()
                     .unwrap();
@@ -127,11 +166,11 @@ fn handle_request(mut stream: TcpStream, directory: String) {
                 let mut file = File::create(&file_path).unwrap();
                 file.write_all(&body_buffer).unwrap();
 
-                "HTTP/1.1 201 Created\r\n\r\n".to_string()
+                CREATED.to_string()
             }
-            _ => "HTTP/1.1 404 Not Found\r\n\r\n".to_string(),
+            _ => NOT_FOUND.to_string(),
         },
-        _ => "HTTP/1.1 405 Method Not Allowed\r\n\r\n".to_string(),
+        _ => METHOD_NOT_ALLOWED.to_string(),
     };
 
     stream
