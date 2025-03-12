@@ -16,14 +16,20 @@ fn main() {
 
                 let response = match method {
                     "GET" => match path {
-                        "/" => "HTTP/1.1 200 OK\r\n\r\n",
-                        _ => "HTTP/1.1 404 Not Found\r\n\r\n",
+                        "/" => "HTTP/1.1 200 OK\r\n\r\n".to_string(),
+                        p if p.starts_with("/echo/") => {
+                            let message = &path[6..];
+                            format!("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {}\r\n\r\n{}", message.len(), message)
+                        }
+                        _ => "HTTP/1.1 404 Not Found\r\n\r\n".to_string(),
                     },
-                    "POST" => "HTTP/1.1 404 Not Found\r\n\r\n",
-                    _ => "HTTP/1.1 405 Method Not Allowed\r\n\r\n",
+                    "POST" => "HTTP/1.1 404 Not Found\r\n\r\n".to_string(),
+                    _ => "HTTP/1.1 405 Method Not Allowed\r\n\r\n".to_string(),
                 };
 
-                stream.write_all(response.as_bytes()).expect("Failed to write to server");
+                stream
+                    .write_all(response.as_bytes())
+                    .expect("Failed to write to server");
             }
         } else {
             eprintln!("error: {}", stream.unwrap_err());
