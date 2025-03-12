@@ -82,6 +82,8 @@ fn handle_request(mut stream: TcpStream, directory: String) {
                         .trim()
                         .split(';')
                         .collect();
+                    
+                    println!("{:?}", accept_encoding);
 
                     if accept_encoding.contains(&"gzip") {
                         format!(
