@@ -185,6 +185,6 @@ fn handle_request(mut stream: TcpStream, directory: String) {
     if !response.is_empty() {
         stream
             .write_all(response.as_bytes())
-            .expect("Failed to write to server");
+            .unwrap();
     }
 }
